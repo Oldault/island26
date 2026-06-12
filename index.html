@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0B0E13">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Islande 13–17 juin 2026 — carte interactive & itinéraire jour par jour">
+<title>ÍSLAND ’26 · Carnet de route</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌋</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=Schibsted+Grotesk:ital,wght@0,400;0,500;0,700;1,400&family=Fragment+Mono:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<style>
+:root{
+  --bg:#0B0E13; --panel:#10151D; --panel2:#161D28; --line:#1E2733;
+  --ink:#E9EEF5; --mut:#8B98A8; --faint:#7E8BA0;
+  --d1:#6FE3F0; --d2:#F2B544; --d3:#5FE0A6; --d4:#F29BBB; --d5:#F0535C;
+  --warn:#FFB04D; --danger:#FF6B6B;
+  --mono:'Fragment Mono',ui-monospace,monospace;
+  --sans:'Schibsted Grotesk',system-ui,sans-serif;
+  --disp:'Unbounded',var(--sans);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%}
+body{
+  background:var(--bg);color:var(--ink);font-family:var(--sans);
+  display:grid;grid-template-rows:auto auto 1fr;height:100vh;height:100dvh;overflow:hidden;
+  -webkit-font-smoothing:antialiased;
+}
+/* grain */
+body::after{
+  content:"";position:fixed;inset:0;z-index:200;pointer-events:none;opacity:.05;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+/* ───────── masthead ───────── */
+.masthead{
+  position:relative;display:flex;align-items:flex-end;justify-content:space-between;gap:16px;
+  padding:14px max(20px,env(safe-area-inset-right)) 12px max(20px,env(safe-area-inset-left));border-bottom:1px solid var(--line);overflow:hidden;background:#0A0D12;
+}
+.masthead::before{
+  content:"";position:absolute;inset:-60% -10% auto;height:200%;pointer-events:none;filter:blur(46px);opacity:.5;
+  background:
+    radial-gradient(38% 60% at 12% 30%, rgba(111,227,240,.30), transparent 70%),
+    radial-gradient(30% 55% at 45% 10%, rgba(95,224,166,.22), transparent 70%),
+    radial-gradient(30% 60% at 78% 35%, rgba(242,155,187,.16), transparent 70%),
+    radial-gradient(24% 50% at 96% 10%, rgba(240,83,92,.14), transparent 70%);
+  animation:aurora 16s ease-in-out infinite alternate;
+}
+@keyframes aurora{from{transform:translateX(-4%) skewX(-3deg)}to{transform:translateX(4%) skewX(3deg)}}
+.brand{position:relative}
+.brand h1{font-family:var(--disp);font-weight:800;font-size:clamp(20px,4.2vw,30px);letter-spacing:.02em;line-height:1}
+.brand h1 .yr{color:var(--d1)}
+.brand .sub{font-family:var(--mono);font-size:10.5px;color:var(--mut);margin-top:7px;letter-spacing:.06em;text-transform:uppercase}
+.mast-meta{position:relative;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.mast-meta span{font-family:var(--mono);font-size:10px;color:var(--mut);border:1px solid var(--line);padding:4px 8px;border-radius:999px;white-space:nowrap;background:rgba(16,21,29,.6)}
+@media (max-width:700px){.mast-meta{display:none}.masthead{padding:12px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left))}}
+/* ───────── tabs ───────── */
+.tabs-shell{position:relative;background:#0C1016}
+.tabs-shell::after{content:"";position:absolute;right:0;top:0;bottom:1px;width:36px;background:linear-gradient(90deg,transparent,#0C1016);pointer-events:none}
+@media (min-width:700px){.tabs-shell::after{display:none}}
+.tabs{
+  display:flex;gap:2px;padding:0 max(12px,env(safe-area-inset-right)) 0 max(12px,env(safe-area-inset-left));border-bottom:1px solid var(--line);background:#0C1016;
+  overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;
+}
+.tabs::-webkit-scrollbar{display:none}
+.tab{
+  appearance:none;background:none;border:none;cursor:pointer;color:var(--mut);
+  font-family:var(--mono);font-size:11px;letter-spacing:.05em;padding:12px 11px 10px;
+  border-bottom:2px solid transparent;white-space:nowrap;display:flex;align-items:center;gap:6px;
+  min-height:44px;
+}
+.tab .dot{width:7px;height:7px;border-radius:50%;background:var(--c,var(--ink));box-shadow:0 0 8px var(--c,transparent);flex:none}
+.tab:hover{color:var(--ink)}
+.tab.on{color:var(--c,var(--ink));border-bottom-color:var(--c,var(--ink))}
+/* ───────── app layout ───────── */
+.app{display:grid;grid-template-columns:480px 1fr;min-height:0}
+.panel{order:1;overflow-y:auto;overscroll-behavior:contain;border-right:1px solid var(--line);background:var(--panel);scrollbar-width:thin;scrollbar-color:#26303E transparent}
+.panel::-webkit-scrollbar{width:10px}
+.panel::-webkit-scrollbar-thumb{background:#222B38;border-radius:8px;border:2px solid var(--panel)}
+.panel::-webkit-scrollbar-track{background:transparent}
+.map-wrap{order:2;position:relative;min-height:0}
+#map{position:absolute;inset:0;background:#0B0E13}
+.map-fallback{position:absolute;inset:0;display:none;place-items:center;text-align:center;color:var(--mut);font-size:14px;padding:24px}
+.legend{
+  position:absolute;z-index:500;left:10px;bottom:10px;display:flex;gap:4px;flex-wrap:wrap;
+  background:rgba(11,14,19,.82);border:1px solid var(--line);border-radius:10px;padding:6px 8px;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+}
+.legend button{appearance:none;border:none;background:none;cursor:pointer;display:flex;align-items:center;gap:5px;color:var(--mut);font-family:var(--mono);font-size:9.5px;padding:7px 8px;border-radius:6px}
+.legend button:hover{color:var(--ink);background:var(--panel2)}
+.legend i{width:8px;height:8px;border-radius:50%;background:var(--c);box-shadow:0 0 6px var(--c)}
+@media (max-width:860px){
+  .app{grid-template-columns:1fr;grid-template-rows:42vh 1fr;grid-template-rows:42dvh 1fr}
+  .map-wrap{order:1}
+  .panel{order:2;border-right:none;border-top:1px solid var(--line)}
+  .legend{display:none}
+}
+body[data-view="infos"] .map-wrap{display:none}
+body[data-view="infos"] .app{grid-template-columns:1fr;grid-template-rows:1fr}
+body[data-view="infos"] .panel{border-right:none}
+/* ───────── itinerary list ───────── */
+.day{padding:0 0 6px;animation:fadeUp .45s both}
+.day:nth-child(2){animation-delay:.05s}.day:nth-child(3){animation-delay:.1s}
+.day:nth-child(4){animation-delay:.15s}.day:nth-child(5){animation-delay:.2s}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+.day-head{
+  position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:14px;
+  padding:14px 18px 12px;background:rgba(16,21,29,.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+  border-bottom:1px solid var(--line);
+}
+.day-head .num{
+  font-family:var(--disp);font-weight:800;font-size:30px;color:var(--c);line-height:1;
+  text-shadow:0 0 22px color-mix(in srgb,var(--c) 55%,transparent);
+}
+.day-head .hgroup{min-width:0}
+.day-head .date{font-family:var(--mono);font-size:9.5px;color:var(--mut);letter-spacing:.14em;text-transform:uppercase}
+.day-head .ttl{font-weight:700;font-size:15.5px;letter-spacing:-.01em;margin-top:2px}
+.day-chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 18px 4px}
+.chip{
+  font-family:var(--mono);font-size:9.5px;color:var(--mut);letter-spacing:.03em;
+  border:1px solid var(--line);border-radius:999px;padding:3.5px 8px;background:var(--panel2);white-space:nowrap;
+}
+.chip.accent{color:var(--c);border-color:color-mix(in srgb,var(--c) 35%,var(--line))}
+.day-note{
+  margin:10px 18px 2px;padding:9px 12px;border-radius:10px;font-size:12.5px;line-height:1.45;color:var(--ink);
+  background:color-mix(in srgb,var(--c) 9%,var(--panel2));border:1px solid color-mix(in srgb,var(--c) 25%,var(--line));
+}
+.stops{padding:8px 0 10px}
+.stop{
+  display:grid;grid-template-columns:52px 22px 1fr;gap:0 6px;padding:10px 16px 10px 14px;cursor:pointer;
+  border-left:3px solid transparent;transition:background .15s;
+}
+.stop:hover{background:rgba(255,255,255,.025)}
+.stop.on{background:var(--panel2);border-left-color:var(--c)}
+.stop:focus-visible{outline:2px solid var(--c);outline-offset:-2px}
+.stop.noclick{cursor:default}
+.stop .t{font-family:var(--mono);font-size:11px;color:var(--c);padding-top:3px;letter-spacing:-.02em}
+.stop .t small{display:block;color:var(--faint);font-size:9px;margin-top:1px}
+.rail{position:relative;display:flex;justify-content:center}
+.rail::before{content:"";position:absolute;top:-12px;bottom:-12px;width:1px;background:var(--line)}
+.stop:first-child .rail::before{top:8px}
+.stop:last-child .rail::before{bottom:auto;height:20px}
+.rail i{
+  position:relative;z-index:1;width:9px;height:9px;border-radius:50%;margin-top:6px;flex:none;
+  background:var(--panel);border:2px solid var(--c);box-shadow:0 0 8px color-mix(in srgb,var(--c) 60%,transparent);
+}
+.stop.on .rail i{background:var(--c)}
+.stop .body{min-width:0}
+.stop .name{font-weight:700;font-size:14px;letter-spacing:-.01em}
+.stop .sub{color:var(--mut);font-size:12.5px;line-height:1.5;margin-top:3px}
+.stop .meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}
+.tag{font-family:var(--mono);font-size:9.5px;border-radius:6px;padding:3px 7px;border:1px solid var(--line);color:var(--mut);background:var(--panel2)}
+.tag.price{color:var(--d2);border-color:#3a3220}
+.tag.warn{color:var(--warn);border-color:#4a3a20;background:#1d1812}
+.tag.danger{color:var(--danger);border-color:#4a2424;background:#1d1212}
+a.tag{text-decoration:none;min-height:28px;display:inline-flex;align-items:center;position:relative}
+a.tag::after{content:"";position:absolute;inset:-7px}
+a.tag.lnk{color:var(--ink);border-color:#2A3340}
+a.tag.lnk:hover{border-color:var(--c);color:var(--c)}
+a.tag.resa{color:var(--c);border-color:color-mix(in srgb,var(--c) 40%,var(--line));font-weight:700}
+.panel-foot{padding:18px 18px max(18px,env(safe-area-inset-bottom));color:var(--faint);font-family:var(--mono);font-size:9.5px;line-height:1.8;border-top:1px solid var(--line)}
+.panel-foot a{color:var(--mut)}
+/* ───────── infos panel ───────── */
+#infos{display:none;max-width:880px;margin:0 auto;padding:6px 18px 40px;width:100%}
+body[data-view="infos"] #infos{display:block}
+body[data-view="infos"] #itinerary{display:none}
+.inf-sec{margin-top:26px}
+.inf-sec>h3{
+  font-family:var(--disp);font-weight:600;font-size:13px;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--ink);display:flex;align-items:center;gap:10px;
+}
+.inf-sec>h3::after{content:"";flex:1;height:1px;background:var(--line)}
+.inf-sec>h3 .em{font-size:16px}
+.inf-sec .lead{color:var(--mut);font-size:13px;line-height:1.6;margin-top:10px}
+table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12.5px}
+th{font-family:var(--mono);font-size:9.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint);text-align:left;padding:6px 8px;border-bottom:1px solid var(--line)}
+td{padding:9px 8px;border-bottom:1px solid var(--line);vertical-align:top;line-height:1.45}
+td.mono,.mono{font-family:var(--mono);font-size:11px}
+td a{color:var(--d1);text-decoration:none}
+td a:hover{text-decoration:underline}
+.ck{display:flex;gap:11px;padding:9px 4px;border-bottom:1px solid var(--line);align-items:flex-start;cursor:pointer}
+.ck input{appearance:none;width:18px;height:18px;flex:none;margin-top:1px;border:1.5px solid var(--faint);border-radius:5px;cursor:pointer;position:relative;background:transparent}
+.ck input:checked{background:var(--d3);border-color:var(--d3)}
+.ck input:checked::after{content:"✓";position:absolute;inset:0;display:grid;place-items:center;color:#0B0E13;font-size:12px;font-weight:900}
+.ck .ck-body{font-size:13px;line-height:1.45}
+.ck .ck-body b{font-weight:700}
+.ck .ck-body small{display:block;color:var(--mut);font-size:11.5px;margin-top:1px}
+.ck input:checked~.ck-body{opacity:.45;text-decoration:line-through}
+.ck .where{margin-left:auto;flex:none;font-family:var(--mono);font-size:10px;color:var(--mut);padding-top:3px;text-align:right}
+.bullets{margin-top:10px}
+.bullets li{list-style:none;padding:7px 0 7px 22px;position:relative;color:var(--mut);font-size:13px;line-height:1.55;border-bottom:1px solid color-mix(in srgb,var(--line) 50%,transparent)}
+.bullets li::before{content:"▸";position:absolute;left:4px;color:var(--d1)}
+.bullets li b{color:var(--ink)}
+.sos{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.sos a,.sos span{font-family:var(--mono);font-size:11px;padding:9px 13px;border-radius:10px;border:1px solid var(--line);color:var(--ink);text-decoration:none;background:var(--panel2)}
+.sos .s112{color:var(--danger);border-color:#4a2424;font-weight:700}
+/* ───────── leaflet skin ───────── */
+.leaflet-container{font-family:var(--sans)}
+.leaflet-control-zoom{border:1px solid var(--line)!important;box-shadow:none!important}
+.leaflet-control-zoom a{background:rgba(13,17,23,.9)!important;color:var(--ink)!important;border-color:var(--line)!important}
+.leaflet-control-attribution{background:rgba(11,14,19,.7)!important;color:var(--faint)!important;font-size:9px!important}
+.leaflet-control-attribution a{color:var(--mut)!important}
+.pin{background:none;border:none;display:grid;place-items:center}
+.pin span{
+  display:grid;place-items:center;width:27px;height:27px;border-radius:50%;
+  font-family:var(--mono);font-size:11px;font-weight:700;color:var(--c);
+  background:color-mix(in srgb,var(--c) 16%,#0B0F15);border:2px solid var(--c);
+  box-shadow:0 0 8px color-mix(in srgb,var(--c) 35%,transparent),0 2px 6px rgba(0,0,0,.5);
+  transition:transform .15s;
+}
+.pin.glyph span{font-size:13px}
+.pin.xtra span{width:15px;height:15px;font-size:0;background:#0B0F15;box-shadow:0 0 8px color-mix(in srgb,var(--c) 40%,transparent)}
+.pin.on span{transform:scale(1.3);background:var(--c);color:#0B0E13;z-index:1000}
+.leaflet-popup-content-wrapper{
+  background:#11161E;color:var(--ink);border-radius:12px;border:1px solid #2A3340;
+  box-shadow:0 10px 30px rgba(0,0,0,.55);
+}
+.leaflet-popup-tip{background:#11161E;border:1px solid #2A3340}
+.leaflet-popup-content{margin:12px 14px;line-height:1.45}
+.leaflet-popup-close-button{color:var(--mut)!important;font-size:18px!important;padding:6px 8px 0 0!important}
+.pp .pp-time{font-family:var(--mono);font-size:9.5px;color:var(--c);letter-spacing:.1em}
+.pp h4{font-size:14px;font-weight:700;margin:3px 0 4px}
+.pp p{color:var(--mut);font-size:12px;margin:0 0 2px}
+.pp .pp-warn{color:var(--warn);font-size:11.5px;margin-top:5px}
+.pp .pp-links{display:flex;gap:6px;margin-top:9px;flex-wrap:wrap}
+.pp .pp-links a{
+  font-family:var(--mono);font-size:10px;color:var(--ink);text-decoration:none;
+  border:1px solid #2A3340;padding:8px 11px;border-radius:7px;
+}
+.pp .pp-links a:hover{border-color:var(--c);color:var(--c)}
+@media print{.map-wrap,.tabs,.masthead::before{display:none}body{height:auto;overflow:visible;display:block}.panel{overflow:visible;border:none}.day{break-inside:avoid}}
+@media (prefers-reduced-motion:reduce){.masthead::before{animation:none}.day{animation:none}}
+</style>
+</head>
+<body data-view="all">
+
+<header class="masthead">
+  <div class="brand">
+    <h1>ÍSLAND <span class="yr">’26</span></h1>
+    <div class="sub">13 → 17 juin 2026 · road trip · soleil de minuit</div>
+  </div>
+  <div class="mast-meta">
+    <span>3 voyageurs</span><span>Dacia Duster 4WD</span><span>camp de base · Laugarvatn</span><span>vol retour 00h30 → 18/06</span>
+  </div>
+</header>
+
+<div class="tabs-shell"><nav class="tabs" id="tabs"></nav></div>
+
+<main class="app">
+  <section class="map-wrap">
+    <div id="map" role="application" aria-label="Carte du voyage"></div>
+    <div class="map-fallback" id="mapFallback"><p>Carte indisponible (hors-ligne ?).<br>La liste reste utilisable — les liens « Maps » ouvrent le GPS.</p></div>
+    <div class="legend" id="legend"></div>
+  </section>
+
+  <aside class="panel" id="panel">
+    <div id="itinerary"></div>
+    <div id="infos"></div>
+    <div class="panel-foot">
+      PLAN V4 · GÉNÉRÉ LE 12 JUIN 2026 · CHAQUE MATIN : <a href="https://vedur.is" target="_blank" rel="noopener">VEDUR.IS</a> + <a href="https://umferdin.is/en" target="_blank" rel="noopener">UMFERDIN.IS</a> · ALERTES : <a href="https://safetravel.is" target="_blank" rel="noopener">SAFETRAVEL.IS</a> · URGENCES : 112
+    </div>
+  </aside>
+</main>
+
+<script>
+/* ════════ DATA — extrait de iceland_trip_plan_v4.md ════════ */
+const DATA = {
+  days: [
+    {
+      id:'d1', n:'01', dow:'SAM', date:'13 JUIN', color:'var(--d1)', hex:'#6FE3F0',
+      title:'Arrivée · Blue Lagoon · Reykjavik',
+      wx:'☁ sec · 7–12 °C · vent fort à Reykjanes',
+      drive:'KEF → lagon 15 min · → Rvk 50 min · → chalet 1h10',
+      note:'Ce soir avant de dormir : les 6 réservations → onglet <b>INFOS</b>.',
+      stops:[
+        {t:'04:30', name:'Réveil + taxi CDG', sub:'Enregistrement 2 h avant le vol.', ll:null},
+        {t:'06:30', name:'Vol CDG → KEF', sub:'Islande = UTC : –2 h vs Paris toute la semaine.', ll:null},
+        {t:'08:20', name:'Atterrissage KEF', sub:'Vol Schengen : pas de contrôle passeport. Alcool au duty-free ARRIVÉE — le moins cher du pays (Vínbúðin fermées dimanche).', ll:[63.99653,-22.62496], gmq:'Keflavik International Airport', icon:'✈', z:13},
+        {t:'09:00', name:'Navette Go Car Rental', sub:'Sortie des arrivées → à gauche, passez Arion Banki → Meeting Point de la navette gratuite (bureau : Fuglavík 43, à 5 min). Dacia Duster 4WD — photos de l’état du véhicule sous TOUS les angles avant de partir.', ll:[64.01534,-22.57638], gmq:'Go Car Rental Fuglavík 43 Reykjanesbær', z:14},
+        {t:'10:00', name:'Blue Lagoon', sub:'~2 h dans l’eau à 38 °C. Serviette + masque silica + boisson inclus. Déjeuner : restaurant Lava (formule « Lagoon & Lava ») ou Blue Café.', ll:[63.88025,-22.45030], gmq:'Blue Lagoon Iceland Norðurljósavegur 9 Grindavík', price:'~95 €', resa:{label:'bluelagoon.com', url:'https://www.bluelagoon.com'}, z:14},
+        {t:'13:45', name:'Route vers Reykjavik', sub:'50 min.', ll:null},
+        {t:'14:45', name:'Hallgrímskirkja + centre-ville', sub:'Tour panoramique ~10 €. Garez-vous dans le quartier et tout se fait à pied.', ll:[64.14180,-21.92671], gmq:'Hallgrímskirkja Reykjavík', price:'~10 €', z:15},
+        {t:'·', tsub:'en face', name:'Café Loki — baptême culinaire', sub:'Plateau dégustation hákarl (requin fermenté) + shot de Brennivín + glace au pain de seigle. Puis Brauð & Co à 300 m : LE cinnamon roll du pays.', ll:[64.14243,-21.92885], gmq:'Café Loki Lokastígur 28 Reykjavík', z:16},
+        {t:'16:45', name:'Bónus Skeifan — courses', sub:'Courses du séjour (~65 €) + la liste culturelle islandaise (→ INFOS · Gastronomie).', ll:[64.13129,-21.86930], gmq:'Bónus Skeifan 11a Reykjavík', warn:'Ferme à 18h00 le samedi', z:14},
+        {t:'17:50', name:'Route 36 → Laugarvatn', sub:'1h10 — passe par Þingvellir : aperçu de demain.', ll:null},
+        {t:'19:00', name:'Check-in chalet — Golden Circle Cabins', sub:'Einholt 1, Laugarvatn — serrure connectée, horaire flexible. Wifi : Einholthouses.', ll:[64.22239,-20.72685], gmq:'Golden Circle Cabins Laugarvatn', icon:'⌂', z:14},
+        {t:'soir', name:'Dîner maison, coucher tôt', sub:'Coucher du soleil 23h50 — masques de sommeil !', ll:null},
+      ],
+      extras:[
+        {name:'Brauð & Co', sub:'Cinnamon roll — Frakkastígur 16', ll:[64.14399,-21.92607], gmq:'Brauð & Co Frakkastígur 16 Reykjavík'},
+      ]
+    },
+    {
+      id:'d2', n:'02', dow:'DIM', date:'14 JUIN', color:'var(--d2)', hex:'#F2B544',
+      title:'Golden Circle — la plus belle journée',
+      wx:'☀ sec · jusqu’à 18 °C',
+      drive:'boucle depuis le chalet · étapes de 10 à 50 min',
+      note:'Parkings payants sur presque tous les sites (~750–1 000 ISK : Þingvellir, Brúarfoss, Geysir…) — carte ou app <b>Parka</b> ; Þingvellir se paye avant minuit.',
+      stops:[
+        {t:'09:00', name:'Þingvellir — parking P1', sub:'Faille d’Almannagjá, entre deux plaques tectoniques. Parking ~1 000 ISK la journée (couvre P1–P3 + P5) — payez avant minuit, bornes du visitor center ou Parka.', ll:[64.25538,-21.13163], gmq:'Þingvellir Parking P1 Hakið', z:13},
+        {t:'·', tsub:'à pied', name:'Öxarárfoss', sub:'La cascade dans la faille — 15 min à pied depuis P1 (ou parking P2 à 10 min, couvert par le même ticket).', ll:[64.26583,-21.11805], gmq:'Öxarárfoss Þingvellir', z:14},
+        {t:'11:30', name:'Brúarfoss', sub:'« La cascade la plus bleue d’Islande ». Parking payant ~750 ISK (Parka), route d’accès caillouteuse, puis 5 min à pied. Option rando : lot gratuit sur la 37 + 3,5 km le long de la rivière (Hlauptungufoss, Miðfoss).', ll:[64.26210,-20.52090], gmq:'Brúarfoss Parking', z:13},
+        {t:'13:00', name:'Geysir / Strokkur', sub:'Éruption toutes les 5–10 min. Parking Geysir Center désormais payant (~1 000 ISK, Parka). Déjeuner au Geysir Center : kjötsúpa, la soupe d’agneau traditionnelle.', ll:[64.31270,-20.30077], gmq:'Strokkur geyser Haukadalur', z:14},
+        {t:'15:00', name:'Gullfoss', sub:'La « chute d’or », double cascade. Arc-en-ciel quasi garanti avec ce soleil.', ll:[64.32524,-20.13074], gmq:'Gullfoss waterfall parking', z:14},
+        {t:'16:45', name:'Kerið', sub:'Cratère volcanique au lac turquoise — ~600 ISK, carte acceptée.', ll:[64.04154,-20.88698], gmq:'Kerið Crater parking', price:'~4 €', z:14},
+        {t:'18:15', name:'Efstidalur — glace de la ferme', sub:'Laiterie en circuit ultra-court : comptoir glaces face aux vaches. +10 min après Laugarvatn.', ll:[64.24234,-20.55214], gmq:'Efstidalur II farm Bláskógabyggð', z:13},
+        {t:'18:45', name:'Soir — Lindin ou cuisine maison', sub:'Lindin (3 min à pied du chalet) : omble chevalier et gibier, LA table du coin. Ce soir : préparer lundi — sandwichs, thermos, affaires de pluie complètes, chaussures montantes, gants.', ll:[64.21558,-20.73120], gmq:'Lindin Restaurant Laugarvatn', z:15},
+      ],
+      extras:[
+        {name:'⌂ Chalet — Einholt 1', sub:'camp de base', ll:[64.22239,-20.72685], gmq:'Golden Circle Cabins Laugarvatn', home:true},
+        {name:'Brúarfoss — la cascade', sub:'passerelle au pied des chutes', ll:[64.26424,-20.51587], gmq:'Brúarfoss waterfall Bláskógabyggð'},
+      ]
+    },
+    {
+      id:'d3', n:'03', dow:'LUN', date:'15 JUIN', color:'var(--d3)', hex:'#5FE0A6',
+      title:'Côte sud + glacier',
+      wx:'🌧 pluie légère 4–7 mm · 7–11 °C',
+      drive:'départ 07h15 · aller 1h20 · retour de Vík 2h10',
+      note:'Imperméable haut <b>et</b> bas, pas de jean. Glacier : chaussures montantes <b>à apporter</b> (pas de location garantie sur place) + gants.',
+      stops:[
+        {t:'08:40', name:'Seljalandsfoss', sub:'Le sentier passe DERRIÈRE la cascade — imperméable total. Parking 1 000 ISK : borne sur place ou checkit.is (PAS sur Parka).', ll:[63.61546,-19.99333], gmq:'Seljalandsfoss Parking', z:14},
+        {t:'·', tsub:'10 min à pied', name:'Gljúfrabúi — la cachée', sub:'Cascade dissimulée dans une gorge, 600 m plus loin — on patauge dans un ruisseau (niveau chevilles). La pépite que 80 % des gens ratent.', ll:[63.62076,-19.98634], gmq:'Gljúfrabúi waterfall Hamragarðar', z:15},
+        {t:'10:30', name:'Skógafoss', sub:'Rideau de 60 m. Les 370 marches mènent à la vue d’en haut. Nouveau parking payant 1 000 ISK (Parka), à 400 m des chutes — l’ancien lot au pied est fermé.', ll:[63.52844,-19.51280], gmq:'Skógafoss Parking', z:14},
+        {t:'11:40', name:'Sólheimajökull — « Blue Ice » : glacier + escalade glaciaire', sub:'RDV au point Arctic Adventures dans le lot, 15–20 min avant le départ de 12h00 (consignes exactes dans l’e-mail de confirmation). 12h00–16h30 : ~3 h sur la glace, dont escalade d’une paroi verticale dans une crevasse (cordes + 2 piolets techniques). Crampons, piolets, casque, lignes de sécurité fournis. Parking 750 ISK (Parka).', ll:[63.53002,-19.37154], gmq:'Sólheimajökull Parking', price:'~190 €', resa:{label:'adventures.is', url:'https://adventures.is'}, warn:'Chaussures montantes À APPORTER (location non garantie) · gants + imperméable bas · pas de jean', z:13},
+        {t:'17:00', name:'Dyrhólaey', sub:'Belvédère bas (Lágey) : arche de lave + macareux (juin = pleine saison, très actifs en fin de journée). Nidification : réserve ouverte ~9h–19h, barrière fermée la nuit — sinon, macareux aussi à Reynisfjara. Parking via Parka.', ll:[63.40481,-19.10698], gmq:'Dyrhólaey View Parking Lot', z:13},
+        {t:'18:15', name:'Reynisfjara — sable noir', sub:'Orgues basaltiques de Reynisdrangar. Parking 1 000 ISK (Parka).', ll:[63.40433,-19.04523], gmq:'Reynisfjara Black Sand Beach Parking', danger:'☠ Vagues « sneaker » mortelles : restez à +30 m de l’eau, JAMAIS dos à l’océan, respectez les panneaux lumineux', z:14},
+        {t:'19:30', name:'Dîner à Vík', sub:'Halldórskaffi : plokkfiskur (écrasé de poisson gratiné) ou agneau · Smiðjan Brugghús : burgers + bières brassées sur place · plan B : The Soup Company.', ll:[63.41761,-19.01401], gmq:'Halldórskaffi Víkurbraut 28 Vík', z:15},
+        {t:'21:00', name:'Route retour — 2h10 réelles', sub:'Il fait encore plein jour. Chalet vers 23h10 — faites sécher l’équipement.', ll:null},
+      ],
+      extras:[
+        {name:'⌂ Chalet — Einholt 1', sub:'départ 07h15 !', ll:[64.22239,-20.72685], gmq:'Golden Circle Cabins Laugarvatn', home:true},
+        {name:'Smiðjan Brugghús', sub:'burgers + bières artisanales', ll:[63.41722,-19.01092], gmq:'Smiðjan Brugghús Sunnubraut 15 Vík'},
+      ]
+    },
+    {
+      id:'d4', n:'04', dow:'MAR', date:'16 JUIN', color:'var(--d4)', hex:'#F29BBB',
+      title:'Détente — Secret Lagoon · Friðheimar · Fontana',
+      wx:'🌫 bruine · 6–11 °C — parfait pour les bains',
+      drive:'tout à moins de 30 min du chalet · grasse matinée méritée',
+      note:'Les bains Fontana sont <b>fermés</b> en ce moment — seule la boulangerie géothermique tourne. Le plan B trempette : Hrunalaug.',
+      stops:[
+        {t:'10:00', name:'Secret Lagoon (Gamla Laugin)', sub:'À l’ouverture = le plus calme. 10h–12h dans l’eau, bruine = ambiance vapeur parfaite. Serviettes en location sur place. Flúðir, 30 min.', ll:[64.13730,-20.30920], gmq:'Secret Lagoon Hvammsvegur Flúðir', price:'~31 €', resa:{label:'secretlagoon.is', url:'https://secretlagoon.is'}, z:14},
+        {t:'12:30', name:'Friðheimar — déjeuner dans la serre', sub:'Soupe de tomates à volonté + pain maison, au milieu des plants, miel de leurs abeilles. Sur réservation — cuisine 11h30–16h. Entrée/parking au bord de la route 35.', ll:[64.17730,-20.44484], gmq:'Friðheimar Reykholt Bláskógabyggð', price:'~23 €', resa:{label:'fridheimar.is', url:'https://www.fridheimar.is'}, z:14},
+        {t:'14:30', name:'Fontana — Geothermal Bakery Tour', sub:'On déterre devant vous la marmite de rúgbrauð enfouie 24 h dans le sable chaud du lac ; dégustation beurre + truite fumée. À 3 min à pied du chalet.', ll:[64.21460,-20.73021], gmq:'Laugarvatn Fontana Hverabraut 1', price:'~22 €', resa:{label:'fontana.is', url:'https://www.fontana.is'}, z:15},
+        {t:'15:30', name:'Option — Hrunalaug', sub:'Source chaude rustique sur terrain privé (~1 000 ISK). Garez-vous au petit parking dédié (route 344) puis 5 min à pied par la colline — ne roulez pas jusqu’à la source · ou sieste/jeux au chalet.', ll:[64.13330,-20.26150], z:14},
+        {t:'soir', name:'Dernier dîner au chalet', sub:'Videz le frigo, bouclez les valises — checkout demain 11h00 max.', ll:null},
+      ],
+      extras:[
+        {name:'⌂ Chalet — Einholt 1', sub:'camp de base', ll:[64.22239,-20.72685], gmq:'Golden Circle Cabins Laugarvatn', home:true},
+      ]
+    },
+    {
+      id:'d5', n:'05', dow:'MER', date:'17 JUIN', color:'var(--d5)', hex:'#F0535C',
+      title:'Fête nationale 🇮🇸 · baleines · vol de nuit',
+      wx:'☁ sec · 7–12 °C · vent modéré — OK bateau',
+      drive:'chalet → Rvk 1h15 · Rvk → KEF 45 min',
+      note:'<b>Þjóðhátíðardagurinn</b> — cérémonie à Austurvöllur le matin, <b>parade depuis Hallgrímskirkja vers midi</b>, festivals à Hljómskálagarður et Klambratún l’après-midi, concerts et bals de rue jusqu’à ~22h. Centre piétonnisé par zones : garez-vous UNE fois près du port, tout à pied. Programme : <a href="https://reykjavik.is/17juni" target="_blank" rel="noopener" style="color:inherit">reykjavik.is/17juni</a> (vérifiez mardi soir). Variante « parade avant tout » : bateau de 09h00 (checkout 07h00, retour à quai ~12h15).',
+      stops:[
+        {t:'09:30', name:'Checkout chalet', sub:'Limite 11h00. Valises bouclées la veille, tour complet, photos.', ll:[64.22239,-20.72685], gmq:'Golden Circle Cabins Laugarvatn', icon:'⌂', z:14},
+        {t:'10:45', name:'Parking — silo Harpa ou Vesturbugt', sub:'N’essayez pas de traverser le centre en voiture un 17 juin. Silo Harpa : entrée par Kalkofnsvegur, 24h/24, 525 ISK/h, hauteur max 2,20 m (OK Duster). Alternative : petit lot du vieux port à 1 min d’Elding (zone P2).', ll:[64.14975,-21.93104], gmq:'Harpa Car Park Austurbakki 2 Reykjavík', icon:'P', z:15},
+        {t:'11:00', name:'Austurvöllur — cérémonie', sub:'Drapeaux, fanfares, costumes traditionnels — la fjallkonan déclame son poème près de la statue de Jón Sigurðsson.', ll:[64.14719,-21.93971], gmq:'Austurvöllur Reykjavík', z:16},
+        {t:'11:45', name:'Sægreifinn (Sea Baron)', sub:'Cabane mythique du port : humarsúpa (soupe de langoustine) + brochettes de poisson. Tôt exprès — jour férié = monde.', ll:[64.15081,-21.94402], gmq:'Sægreifinn Sea Baron Geirsgata 8 Reykjavík', z:16},
+        {t:'12:30', name:'Elding — whale watching 13h–16h15', sub:'Check-in 30 min avant à la billetterie ROUGE, base du quai Ægisgarður (pas le navire-musée 150 m à l’est). Baie de Faxaflói : petits rorquals, baleines à bosse, dauphins à bec blanc, marsouins. Combinaisons chaudes + cachets anti-mal de mer fournis. Billet retour gratuit si zéro observation.', ll:[64.15143,-21.94444], gmq:'Elding Whale Watching Ægisgarður 5 Reykjavík', price:'~88 €', resa:{label:'elding.is', url:'https://elding.is'}, warn:'Habillez-vous chaud : –5 à –8 °C en mer', z:15},
+        {t:'16:30', name:'Plongée dans la fête', sub:'Festival familial à Hljómskálagarður (bord du lac Tjörnin, 10 min à pied) : concerts, théâtre de rue, cirque, vieilles voitures, food trucks. Puis Laugavegur / Arnarhóll — les scènes du soir s’allument vers 20h.', ll:[64.14240,-21.94370], gmq:'Hljómskálagarður Reykjavik', z:15},
+        {t:'18:30', name:'Dîner d’adieu', sub:'Food trucks de la fête + dernier hot-dog Bæjarins Beztu (l’option la plus dans le thème) · assis : Messinn (réservé la veille) · budget : Icelandic Street Food.', ll:[64.14816,-21.93784], gmq:'Bæjarins Beztu Pylsur Tryggvagata 1 Reykjavík', z:16},
+        {t:'20:00', name:'Route KEF + plein d’essence', sub:'Plein avant de rendre la voiture : N1 Hafnargata 86 (24h/24, CB à code PIN) — backup N1 Flugvellir 27, plus près du retour Go Car.', ll:[63.99672,-22.54944], gmq:'N1 Hafnargata 86 Keflavík', icon:'⛽', z:13},
+        {t:'21:00', name:'Retour voiture Go Car Rental', sub:'Fuglavík 43. Photos + jauge pleine. Navette terminal. 21h45 bag drop + sécurité, dernier café au duty-free.', ll:[64.01534,-22.57638], gmq:'Go Car Rental Fuglavík 43 Reykjanesbær', z:14},
+        {t:'00:30', name:'Vol KEF → CDG (jeudi 18)', sub:'Arrivée CDG ~05h30. Dormez dans l’avion 😴', ll:[63.99653,-22.62496], gmq:'Keflavik International Airport', icon:'✈', z:13},
+      ],
+      extras:[
+        {name:'Parking vieux port — Ægisgarður', sub:'~18 places publiques à 1 min d’Elding · zone P2 payante (Parka/EasyPark) · évitez le lot privé « customers only » de Grandagarður (1 200 ISK/h)', ll:[64.15101,-21.94475]},
+        {name:'Messinn', sub:'plokkfiskur — si réservé', ll:[64.14656,-21.93783], gmq:'Messinn Lækjargata 6b Reykjavík'},
+        {name:'Arnarhóll — scènes du soir', sub:'concerts dès ~20h', ll:[64.14780,-21.93305], gmq:'Arnarhóll Reykjavík'},
+      ]
+    },
+  ],
+};
+
+/* ════════ INFOS (réservations, gastronomie, budget, valise, conseils) ════════ */
+const INFOS = {
+  resas: [
+    {id:'r1', what:'Blue Lagoon — Comfort ou « Lagoon & Lava »', when:'Sam 13 · 10h00', price:'~95 €', url:'https://www.bluelagoon.com', tip:'La formule « Lagoon & Lava » (Premium + menu 2 plats, –3 000 ISK jusqu’au 30/06) règle aussi le déjeuner.'},
+    {id:'r2', what:'« Blue Ice » — glacier hike + escalade glaciaire, Sólheimajökull (Arctic Adventures)', when:'Lun 15 · 12h00', price:'~190 €', url:'https://adventures.is', tip:'Option « From Sólheimajökull » (meet on location), 14 ans+. Annulation gratuite jusqu’à 24 h. Créneau 12h00 vérifié dispo le 12/06. Ne réservez PAS l’easy hike de troll.is.'},
+    {id:'r3', what:'Whale watching — Elding « Classic »', when:'Mer 17 · 13h00', price:'~88 €', url:'https://elding.is', tip:'Départs quotidiens 9h/13h/17h. Le 9h00 si vous préférez voir la parade.'},
+    {id:'r4', what:'Secret Lagoon', when:'Mar 16 · 10h00', price:'~31 €', url:'https://secretlagoon.is', tip:''},
+    {id:'r5', what:'Friðheimar (table) — recommandé', when:'Mar 16 · ~12h30', price:'repas ~23 €', url:'https://www.fridheimar.is', tip:'Déjeuner dans la serre à tomates.'},
+    {id:'r6', what:'Fontana — Geothermal Bakery Tour', when:'Mar 16 · 14h30', price:'~22 €', url:'https://www.fontana.is', tip:'Les bains Fontana sont fermés — seule la boulangerie tourne.'},
+    {id:'r7', what:'Messinn (si dîner assis mercredi soir)', when:'Mer 17 · soir', price:'—', url:'https://www.messinn.com', tip:'Le 17 est férié, le centre sera bondé ; sinon food trucks de la fête.'},
+    {id:'r8', what:'Alertes SafeTravel + apps', when:'ce soir', price:'gratuit', url:'https://safetravel.is', tip:'App 112 Iceland, Google Maps hors-ligne « sud-ouest Islande », app Parka (parkings).'},
+  ],
+  food: [
+    {id:'f1', name:'Pylsa « eina með öllu »', what:'hot-dog à l’agneau « avec tout »', where:'Bæjarins Beztu · J1/J5'},
+    {id:'f2', name:'Hákarl + Brennivín', what:'requin fermenté + schnaps « Black Death » — le défi entre potes', where:'Café Loki · J1'},
+    {id:'f3', name:'Glace au pain de seigle', what:'la spécialité maison', where:'Café Loki · J1'},
+    {id:'f4', name:'Cinnamon roll', what:'boulangerie nouvelle vague', where:'Brauð & Co · J1'},
+    {id:'f5', name:'Kjötsúpa', what:'soupe d’agneau traditionnelle', where:'Geysir Center · J2'},
+    {id:'f6', name:'Glace de ferme + skyr', what:'laiterie en circuit ultra-court', where:'Efstidalur · J2'},
+    {id:'f7', name:'Omble chevalier', what:'le poisson des lacs islandais', where:'Lindin · J2/J4'},
+    {id:'f8', name:'Plokkfiskur', what:'écrasé de poisson gratiné, réconfort national', where:'Halldórskaffi · J3 / Messinn · J5'},
+    {id:'f9', name:'Bière artisanale de Vík', what:'brassée sur place', where:'Smiðjan Brugghús · J3'},
+    {id:'f10', name:'Soupe de tomates de serre', what:'à volonté, au milieu des plants', where:'Friðheimar · J4'},
+    {id:'f11', name:'Rúgbrauð géothermique', what:'pain cuit 24 h dans le sable chaud + truite fumée', where:'Fontana · J4'},
+    {id:'f12', name:'Humarsúpa', what:'soupe de langoustine crémeuse', where:'Sægreifinn · J5'},
+  ],
+  bonus: [
+    {id:'b1', name:'Skyr', what:'petit-déj'},
+    {id:'b2', name:'Harðfiskur', what:'poisson séché — se mange avec du beurre, snack de route'},
+    {id:'b3', name:'Flatkökur + hangikjöt', what:'galettes de seigle + agneau fumé : le sandwich islandais'},
+    {id:'b4', name:'Kleinur', what:'beignets torsadés'},
+    {id:'b5', name:'Rúgbrauð + smjör', what:'pain de seigle + LE beurre islandais'},
+    {id:'b6', name:'Appelsín', what:'soda orange culte'},
+    {id:'b7', name:'Einstök / Gull', what:'bières — plutôt au duty-free (supermarché = 2,25 % max)'},
+  ],
+  budget: [
+    ['Blue Lagoon Comfort','~95 €','~285 €'],
+    ['Glacier hike + escalade glaciaire','~190 €','~570 €'],
+    ['Whale watching Elding','~88 €','~264 €'],
+    ['Secret Lagoon','~31 €','~93 €'],
+    ['Fontana Bakery Tour','~22 €','~66 €'],
+    ['Hallgrímskirkja (tour)','~10 €','~30 €'],
+    ['Kerið','~4 €','~12 €'],
+    ['Parkings','~8 €','~24 €'],
+    ['<b>Total socle</b>','<b>~448 €</b>','<b>~1 344 €</b>'],
+    ['Option Friðheimar (déjeuner)','+23 €','+69 €'],
+  ],
+  valise: [
+    {id:'v1', name:'Imperméable haut ET bas'},
+    {id:'v2', name:'Polaire'},
+    {id:'v3', name:'Bonnet + gants', what:'aussi pour le bateau !'},
+    {id:'v4', name:'Chaussures de rando montantes', what:'glacier — à apporter, pas de location garantie sur place'},
+    {id:'v5', name:'Maillot + serviette microfibre'},
+    {id:'v6', name:'Tongs vestiaires'},
+    {id:'v7', name:'Masque de sommeil + bouchons d’oreilles', what:'soleil de minuit — jamais nuit'},
+    {id:'v8', name:'Lunettes de soleil + crème solaire'},
+    {id:'v9', name:'Batterie externe', what:'vent + humidité vident les batteries'},
+    {id:'v10', name:'Sacs étanches', what:'pour la pellicule argentique'},
+    {id:'v11', name:'Gourdes', what:'eau du robinet excellente'},
+  ],
+  conseils: [
+    '<b>Paiement</b> : quasi 100 % sans espèces — CB partout, parkings via l’app Parka. Pas besoin d’ISK.',
+    '<b>Essence</b> : pompes automatiques à code PIN. Plein complet avant de rendre la voiture.',
+    '<b>Conduite</b> : 90 km/h route, 50 en ville, phares 24h/24, jamais d’arrêt photo sur la chaussée.',
+    '<b>Chaque matin</b> : vedur.is (météo + alertes) et road.is / umferdin.is (état des routes).',
+    '<b>Soleil de minuit</b> : coucher ~23h50, lever ~3h00 — il ne fait jamais nuit.',
+    '<b>Reynisfjara</b> : jamais dos à l’océan, +30 m de l’eau, zones d’alerte lumineuses.',
+    '<b>Bateau (J5)</b> : habillez-vous chaud (–5 à –8 °C en mer) ; mangez léger si sensibles au mal de mer.',
+    '<b>Fête nationale (J5)</b> : centre piéton par zones, parkings saturés — visez Harpa/Vesturbugt dès 10h45. Beaucoup de commerces ferment ou réduisent les horaires le 17 — les restos touristiques restent ouverts.',
+    '<b>Volcan</b> : aucune éruption en cours (vérifié 12 juin) ; le magma s’accumule sous Svartsengi — seule la péninsule de Reykjanes serait concernée, chalet et côte sud non exposés. Blue Lagoon ouvert (8h–22h), rodé aux évacuations préventives. Suivi : safetravel.is.',
+    '<b>Baleines</b> : par cohérence avec la sortie d’observation, évitez la viande de baleine aux cartes touristiques (« Meet Us, Don’t Eat Us »).',
+    '<b>Photos</b> : batteries chargées chaque soir.',
+  ],
+  meteo: [
+    ['Sam 13','Blue Lagoon / Reykjavik','Sec, couvert, 7–12 °C — vent soutenu à Reykjanes (rafales ~65 km/h), génial dans l’eau à 38 °C'],
+    ['Dim 14','Golden Circle','La plus belle journée : sec, jusqu’à 18 °C'],
+    ['Lun 15','Côte sud / glacier','Pluie légère (4–7 mm), 7–11 °C — imperméable haut ET bas'],
+    ['Mar 16','Flúðir / Laugarvatn','Bruine, 6–11 °C — journée bains chauds, parfait'],
+    ['Mer 17','Reykjavik / Faxaflói','Sec, couvert, 7–12 °C, vent modéré — OK pour le bateau'],
+  ],
+};
+
+/* ════════ APP ════════ */
+const $ = s => document.querySelector(s);
+const esc = s => (s||'').replace(/"/g,'&quot;');
+const gm = (st) => st.gmq
+  ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(st.gmq)
+  : 'https://www.google.com/maps/search/?api=1&query=' + st.ll[0] + ',' + st.ll[1];
+
+let map = null, hasMap = (typeof L !== 'undefined');
+const markersByUid = {};
+let activeUid = null;
+
+/* ---- tabs + legend ---- */
+const VIEWS = [{v:'all', label:'TOUS', c:'var(--ink)'}]
+  .concat(DATA.days.map(d => ({v:d.id, label:d.dow+' '+d.date.split(' ')[0], c:d.color})))
+  .concat([{v:'infos', label:'✦ INFOS', c:'#B7C3D4'}]);
+
+$('#tabs').innerHTML = VIEWS.map(t =>
+  `<button class="tab" data-v="${t.v}" style="--c:${t.c}"><span class="dot"></span>${t.label}</button>`).join('');
+
+$('#legend').innerHTML = DATA.days.map(d =>
+  `<button data-v="${d.id}" style="--c:${d.hex}"><i></i>J${+d.n}</button>`).join('');
+
+/* ---- itinerary list ---- */
+function stopRow(d, st, i){
+  const uid = st.ll ? d.id+':'+i : '';
+  const meta = [
+    st.price ? `<span class="tag price">${st.price}</span>` : '',
+    st.warn ? `<span class="tag warn">⚠ ${st.warn}</span>` : '',
+    st.danger ? `<span class="tag danger">${st.danger}</span>` : '',
+    st.resa ? `<a class="tag resa" style="--c:${d.hex}" href="${st.resa.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()">⊕ Résa · ${st.resa.label}</a>` : '',
+    st.ll ? `<a class="tag lnk" href="${gm(st)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">↗ Maps</a>` : '',
+  ].filter(Boolean).join('');
+  return `<div class="stop ${st.ll?'':'noclick'}" ${uid?`data-uid="${uid}" tabindex="0" role="button" aria-label="${esc(st.name)}"`:''}>
+    <div class="t">${st.t}${st.tsub?`<small>${st.tsub}</small>`:''}</div>
+    <div class="rail"><i></i></div>
+    <div class="body">
+      <div class="name">${st.name}</div>
+      <div class="sub">${st.sub||''}</div>
+      ${meta?`<div class="meta">${meta}</div>`:''}
+    </div>
+  </div>`;
+}
+$('#itinerary').innerHTML = DATA.days.map(d => `
+  <section class="day" id="sec-${d.id}" style="--c:${d.color}">
+    <div class="day-head">
+      <div class="num">${d.n}</div>
+      <div class="hgroup">
+        <div class="date">${d.dow} ${d.date} · JOUR ${+d.n}</div>
+        <div class="ttl">${d.title}</div>
+      </div>
+    </div>
+    <div class="day-chips"><span class="chip accent">${d.wx}</span><span class="chip">⏱ ${d.drive}</span></div>
+    ${d.note?`<div class="day-note">${d.note}</div>`:''}
+    <div class="stops">${d.stops.map((st,i)=>stopRow(d,st,i)).join('')}</div>
+  </section>`).join('');
+
+/* ---- infos panel ---- */
+function ckRow(prefix, it, where){
+  return `<label class="ck"><input type="checkbox" data-ck="${prefix}:${it.id}">
+    <span class="ck-body"><b>${it.name}</b>${it.what?` — ${it.what}`:''}${it.tip?`<small>${it.tip}</small>`:''}</span>
+    ${where?`<span class="where">${where}</span>`:''}</label>`;
+}
+$('#infos').innerHTML = `
+  <div class="inf-sec">
+    <h3><span class="em">⚡</span> À réserver ce soir</h3>
+    <p class="lead">Vendredi soir, avant de dormir — dans cet ordre.</p>
+    ${INFOS.resas.map(r => `<label class="ck"><input type="checkbox" data-ck="resa:${r.id}">
+      <span class="ck-body"><b>${r.what}</b> — <a href="${r.url}" target="_blank" rel="noopener">${r.url.replace(/^https?:\/\/(www\.)?/,'')}</a>${r.tip?`<small>${r.tip}</small>`:''}</span>
+      <span class="where">${r.when}<br>${r.price}</span></label>`).join('')}
+  </div>
+  <div class="inf-sec">
+    <h3><span class="em">🍽</span> Gastronomie — la check-list du trip</h3>
+    ${INFOS.food.map(f => ckRow('food', f, f.where)).join('')}
+    <p class="lead" style="margin-top:14px"><b>La liste Bónus pour le chalet (J1) :</b></p>
+    ${INFOS.bonus.map(b => ckRow('bonus', b, '')).join('')}
+  </div>
+  <div class="inf-sec">
+    <h3><span class="em">🌦</span> Météo prévue (12 juin au soir)</h3>
+    <p class="lead">À recouper chaque matin sur <a href="https://vedur.is" target="_blank" rel="noopener" style="color:var(--d1)">vedur.is</a>.</p>
+    <table><thead><tr><th>Jour</th><th>Zone clé</th><th>Prévision</th></tr></thead><tbody>
+      ${INFOS.meteo.map(m=>`<tr><td class="mono">${m[0]}</td><td>${m[1]}</td><td>${m[2]}</td></tr>`).join('')}
+    </tbody></table>
+  </div>
+  <div class="inf-sec">
+    <h3><span class="em">💶</span> Budget activités (hors restos, courses, essence)</h3>
+    <table><thead><tr><th>Poste</th><th>/pers</th><th>×3</th></tr></thead><tbody>
+      ${INFOS.budget.map(b=>`<tr><td>${b[0]}</td><td class="mono">${b[1]}</td><td class="mono">${b[2]}</td></tr>`).join('')}
+    </tbody></table>
+    <p class="lead">⚠ Vérifié le 12/06 : la plupart des parkings de sites sont devenus payants (750–1 000 ISK chacun : Þingvellir, Geysir, Brúarfoss, Seljalandsfoss, Skógafoss, Sólheimajökull, Dyrhólaey, Reynisfjara…). Comptez plutôt <b>~50 € de parkings pour la voiture</b> sur les 5 jours.</p>
+  </div>
+  <div class="inf-sec">
+    <h3><span class="em">🎒</span> Checklist valise</h3>
+    ${INFOS.valise.map(v => ckRow('valise', v, '')).join('')}
+  </div>
+  <div class="inf-sec">
+    <h3><span class="em">🧭</span> Conseils pratiques</h3>
+    <ul class="bullets">${INFOS.conseils.map(c=>`<li>${c}</li>`).join('')}</ul>
+    <div class="sos">
+      <span class="s112">SOS 112</span>
+      <a href="https://safetravel.is" target="_blank" rel="noopener">safetravel.is</a>
+      <a href="https://vedur.is" target="_blank" rel="noopener">vedur.is</a>
+      <a href="https://umferdin.is/en" target="_blank" rel="noopener">routes · umferdin.is</a>
+      <a href="https://reykjavik.is/17juni" target="_blank" rel="noopener">programme 17 juin</a>
+    </div>
+  </div>`;
+
+/* checkbox persistence */
+(function(){
+  let store = {};
+  try { store = JSON.parse(localStorage.getItem('isl26')||'{}'); } catch(e){}
+  document.querySelectorAll('[data-ck]').forEach(cb => {
+    cb.checked = !!store[cb.dataset.ck];
+    cb.addEventListener('change', () => {
+      store[cb.dataset.ck] = cb.checked;
+      try { localStorage.setItem('isl26', JSON.stringify(store)); } catch(e){}
+    });
+  });
+})();
+
+/* ---- map ---- */
+if (hasMap) {
+  map = L.map('map', {zoomControl:false, attributionControl:true});
+  L.control.zoom({position:'bottomright'}).addTo(map);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains:'abcd', maxZoom:20,
+  }).addTo(map);
+
+  const pinIcon = (d, label, cls) => L.divIcon({
+    className:'pin '+cls, iconSize:[27,27], iconAnchor:[14,14], popupAnchor:[0,-14],
+    html:`<span style="--c:${d.hex}">${label}</span>`,
+  });
+
+  DATA.days.forEach(d => {
+    d.layerMain = L.layerGroup();
+    d.layerExtra = L.layerGroup();
+    const path = [];
+    let num = 0;
+    d.stops.forEach((st, i) => {
+      if (!st.ll) return;
+      num++;
+      path.push(st.ll);
+      const uid = d.id+':'+i;
+      const mk = L.marker(st.ll, {icon: pinIcon(d, st.icon||num, st.icon?'glyph':''), riseOnHover:true, zIndexOffset:num*10});
+      mk.bindPopup(popupHtml(d, st), {maxWidth:260});
+      mk.on('click', () => setActive(uid, {scrollList:true}));
+      markersByUid[uid] = mk;
+      mk.addTo(d.layerMain);
+    });
+    (d.extras||[]).forEach(x => {
+      const mk = L.marker(x.ll, {icon: pinIcon(d, x.home?'⌂':'', x.home?'glyph':'xtra')});
+      mk.bindPopup(popupHtml(d, x), {maxWidth:240});
+      mk.addTo(d.layerExtra);
+    });
+    d.path = L.polyline(path, {color:d.hex, weight:2, opacity:.5, dashArray:'2 7'});
+  });
+} else {
+  $('#mapFallback').style.display = 'grid';
+}
+
+function popupHtml(d, st){
+  const links = [
+    `<a href="${gm(st)}" target="_blank" rel="noopener">↗ Google Maps</a>`,
+    st.resa ? `<a href="${st.resa.url}" target="_blank" rel="noopener">⊕ ${st.resa.label}</a>` : '',
+  ].filter(Boolean).join('');
+  return `<div class="pp" style="--c:${d.hex}">
+    <span class="pp-time">${d.dow} ${d.date}${st.t && st.t!=='·' ? ' · '+st.t : ''}</span>
+    <h4>${st.name}</h4>
+    <p>${st.sub||''}</p>
+    ${st.warn?`<div class="pp-warn">⚠ ${st.warn}</div>`:''}${st.danger?`<div class="pp-warn">${st.danger}</div>`:''}
+    <div class="pp-links">${links}</div>
+  </div>`;
+}
+
+/* ---- active stop sync ---- */
+function setActive(uid, opts={}){
+  if (activeUid){
+    const prev = document.querySelector(`.stop[data-uid="${activeUid}"]`);
+    prev && prev.classList.remove('on');
+    const pm = markersByUid[activeUid];
+    if (pm && pm.getElement()) pm.getElement().classList.remove('on');
+  }
+  activeUid = uid;
+  const row = document.querySelector(`.stop[data-uid="${uid}"]`);
+  row && row.classList.add('on');
+  const mk = markersByUid[uid];
+  if (mk && mk.getElement()) mk.getElement().classList.add('on');
+  if (opts.scrollList && row) row.scrollIntoView({block:'center', behavior:'smooth'});
+}
+
+document.querySelectorAll('.stop[data-uid]').forEach(row => {
+  row.addEventListener('click', () => {
+    const uid = row.dataset.uid;
+    const [dayId, idx] = uid.split(':');
+    const d = DATA.days.find(x=>x.id===dayId);
+    const st = d.stops[+idx];
+    setActive(uid);
+    if (!hasMap) return;
+    if (currentView !== 'all' && currentView !== dayId) return;
+    map.flyTo(st.ll, st.z||13, {duration:.7});
+    const mk = markersByUid[uid];
+    mk && setTimeout(()=>mk.openPopup(), 750);
+  });
+  row.addEventListener('keydown', e => { if (e.key==='Enter'||e.key===' '){ e.preventDefault(); row.click(); } });
+});
+
+/* ---- views ---- */
+let currentView = 'all';
+function applyView(v){
+  currentView = v;
+  document.body.dataset.view = v;
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.v===v));
+  DATA.days.forEach(d => {
+    const show = (v==='all' || v===d.id);
+    $('#sec-'+d.id).style.display = show ? '' : 'none';
+    if (!hasMap) return;
+    if (v==='all'){ d.layerMain.addTo(map); d.path.addTo(map); map.removeLayer(d.layerExtra); }
+    else if (v===d.id){ d.layerMain.addTo(map); d.path.addTo(map); d.layerExtra.addTo(map); }
+    else { map.removeLayer(d.layerMain); map.removeLayer(d.layerExtra); map.removeLayer(d.path); }
+  });
+  $('#panel').scrollTop = 0;
+  if (!hasMap || v==='infos') return;
+  requestAnimationFrame(() => {
+    map.invalidateSize();
+    const pts = [];
+    DATA.days.forEach(d => {
+      if (v==='all' || v===d.id) d.stops.forEach(st => st.ll && pts.push(st.ll));
+      if (v===d.id) (d.extras||[]).forEach(x => pts.push(x.ll));
+    });
+    if (pts.length) map.fitBounds(L.latLngBounds(pts), {padding:[34,34], maxZoom:14});
+  });
+}
+$('#tabs').addEventListener('click', e => {
+  const b = e.target.closest('.tab'); if (b) applyView(b.dataset.v);
+});
+$('#legend').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (b) applyView(b.dataset.v);
+});
+window.addEventListener('resize', () => { if (hasMap && currentView!=='infos') map.invalidateSize(); });
+
+applyView('all');
+</script>
+</body>
+</html>
