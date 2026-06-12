@@ -60,7 +60,7 @@ body::after{
 .mast-meta span{font-family:var(--mono);font-size:10px;color:var(--mut);border:1px solid var(--line);padding:4px 8px;border-radius:999px;white-space:nowrap;background:rgba(16,21,29,.6)}
 @media (max-width:700px){.mast-meta{display:none}.masthead{padding:12px max(16px,env(safe-area-inset-right)) 10px max(16px,env(safe-area-inset-left))}}
 /* ───────── tabs ───────── */
-.tabs-shell{position:relative;background:#0C1016}
+.tabs-shell{position:relative;background:#0C1016;min-width:0}
 .tabs-shell::after{content:"";position:absolute;right:0;top:0;bottom:1px;width:36px;background:linear-gradient(90deg,transparent,#0C1016);pointer-events:none}
 @media (min-width:700px){.tabs-shell::after{display:none}}
 .tabs{
@@ -78,7 +78,7 @@ body::after{
 .tab:hover{color:var(--ink)}
 .tab.on{color:var(--c,var(--ink));border-bottom-color:var(--c,var(--ink))}
 /* ───────── app layout ───────── */
-.app{display:grid;grid-template-columns:480px 1fr;min-height:0}
+.app{display:grid;grid-template-columns:480px 1fr;min-height:0;min-width:0}
 .panel{order:1;overflow-y:auto;overscroll-behavior:contain;border-right:1px solid var(--line);background:var(--panel);scrollbar-width:thin;scrollbar-color:#26303E transparent}
 .panel::-webkit-scrollbar{width:10px}
 .panel::-webkit-scrollbar-thumb{background:#222B38;border-radius:8px;border:2px solid var(--panel)}
@@ -230,13 +230,33 @@ td a:hover{text-decoration:underline}
 .pp .pp-links a{
   font-family:var(--mono);font-size:10px;color:var(--ink);text-decoration:none;
   border:1px solid #2A3340;padding:8px 11px;border-radius:7px;
+  display:inline-flex;align-items:center;min-height:44px;
 }
 .pp .pp-links a:hover{border-color:var(--c);color:var(--c)}
+/* ≤860px : autoriser chips et libellés à passer à la ligne
+   (placé après les règles de base pour gagner la cascade) */
+@media (max-width:860px){
+  .day-chips .chip{white-space:normal}
+  .ck .where{flex:0 1 auto}
+}
+/* ───────── pastille hors-ligne ───────── */
+.offline-pill{
+  position:fixed;top:max(10px,env(safe-area-inset-top));left:50%;transform:translateX(-50%);z-index:900;
+  display:none;align-items:center;gap:7px;
+  font-family:var(--mono);font-size:10px;letter-spacing:.08em;color:var(--warn);
+  background:#1d1812;border:1px solid #4a3a20;border-radius:999px;padding:7px 12px;white-space:nowrap;
+  box-shadow:0 6px 18px rgba(0,0,0,.45);
+}
+.offline-pill.show{display:flex}
+.offline-pill i{width:7px;height:7px;border-radius:50%;background:var(--warn);box-shadow:0 0 8px var(--warn);animation:blink 1.6s infinite}
+@keyframes blink{50%{opacity:.35}}
 @media print{.map-wrap,.tabs,.masthead::before{display:none}body{height:auto;overflow:visible;display:block}.panel{overflow:visible;border:none}.day{break-inside:avoid}}
 @media (prefers-reduced-motion:reduce){.masthead::before{animation:none}.day{animation:none}}
 </style>
 </head>
 <body data-view="all">
+
+<div class="offline-pill" id="offlinePill" role="status"><i></i>HORS-LIGNE · DONNÉES EN CACHE</div>
 
 <header class="masthead">
   <div class="brand">
@@ -261,7 +281,7 @@ td a:hover{text-decoration:underline}
     <div id="itinerary"></div>
     <div id="infos"></div>
     <div class="panel-foot">
-      PLAN V4 · GÉNÉRÉ LE 12 JUIN 2026 · CHAQUE MATIN : <a href="https://vedur.is" target="_blank" rel="noopener">VEDUR.IS</a> + <a href="https://umferdin.is/en" target="_blank" rel="noopener">UMFERDIN.IS</a> · ALERTES : <a href="https://safetravel.is" target="_blank" rel="noopener">SAFETRAVEL.IS</a> · URGENCES : 112
+      PLAN V4 · GÉNÉRÉ LE 12 JUIN 2026 · CHAQUE MATIN : <a href="https://vedur.is" target="_blank" rel="noopener">VEDUR.IS</a> + <a href="https://umferdin.is/en" target="_blank" rel="noopener">UMFERDIN.IS</a> · ALERTES : <a href="https://safetravel.is" target="_blank" rel="noopener">SAFETRAVEL.IS</a> · URGENCES : 112<span id="swStatus"></span>
     </div>
   </aside>
 </main>
@@ -587,7 +607,7 @@ if (hasMap) {
   L.control.zoom({position:'bottomright'}).addTo(map);
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     attribution:'© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> · © <a href="https://carto.com/attributions">CARTO</a>',
-    subdomains:'abcd', maxZoom:20,
+    subdomains:'abcd', maxZoom:20, crossOrigin:'anonymous',
   }).addTo(map);
 
   const pinIcon = (d, label, cls) => L.divIcon({
@@ -703,6 +723,21 @@ $('#legend').addEventListener('click', e => {
 window.addEventListener('resize', () => { if (hasMap && currentView!=='infos') map.invalidateSize(); });
 
 applyView('all');
+
+/* ---- hors-ligne : service worker + pastille ---- */
+const pill = $('#offlinePill');
+const syncOnline = () => pill.classList.toggle('show', !navigator.onLine);
+window.addEventListener('online', syncOnline);
+window.addEventListener('offline', syncOnline);
+syncOnline();
+if ('serviceWorker' in navigator && (location.protocol === 'https:' || ['localhost','127.0.0.1'].includes(location.hostname))) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(() => navigator.serviceWorker.ready)
+      .then(() => { $('#swStatus').textContent = ' · HORS-LIGNE : PRÊT ✓'; })
+      .catch(() => {});
+  });
+}
 </script>
 </body>
 </html>
