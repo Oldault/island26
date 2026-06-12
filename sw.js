@@ -8,7 +8,7 @@
      (purge le cache statique ; les tuiles déjà vues survivent). */
 'use strict';
 
-const VERSION = 'v3';
+const VERSION = 'v4';
 const STATIC_CACHE = 'isl26-static-' + VERSION;
 const TILE_CACHE = 'isl26-tiles-keep';
 const TILE_LIMIT = 600;
